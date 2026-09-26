@@ -41,6 +41,8 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     private var toRemove = Set<DropletNode>()
     private var textures: [DropKind: SKTexture] = [:]
     private let maxDroplets = 120
+    /// Scales the whole simulation. 0.8 = droplets move 20% slower along the same paths.
+    static let pace: CGFloat = 0.8
     /// How far above the finger a dragged part floats.
     static let hoverOffset: CGFloat = 40
 
@@ -48,7 +50,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
 
     override func didMove(to view: SKView) {
         backgroundColor = SKColor(red: 0.05, green: 0.07, blue: 0.12, alpha: 1)
-        physicsWorld.gravity = CGVector(dx: 0, dy: -2.6)
+        physicsWorld.gravity = CGVector(dx: 0, dy: -2.6 * GameScene.pace * GameScene.pace)
         physicsWorld.contactDelegate = self
         for l in [staticLayer, worldLayer, toolLayer, dropLayer, fxLayer, trayLayer] where l.parent == nil { addChild(l) }
         staticLayer.zPosition = 0
@@ -269,7 +271,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
             }
             // Droplets that come to rest evaporate so ledges never clog up.
             let speed = hypot(body.velocity.dx, body.velocity.dy)
-            drop.idle = speed < 6 ? drop.idle + dt : 0
+            drop.idle = speed < 6 * GameScene.pace ? drop.idle + dt : 0
             if drop.idle > 1.6 {
                 toRemove.insert(drop)
                 puff(at: drop.position, color: drop.kind.color.withAlphaComponent(0.5), big: false)
@@ -277,19 +279,20 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
             }
             for a in accels where hypot(drop.position.x - a.position.x, drop.position.y - a.position.y) < 20 {
                 let dir = a.direction
-                body.velocity = CGVector(dx: dir.dx * 320, dy: dir.dy * 320)
+                body.velocity = CGVector(dx: dir.dx * 320 * GameScene.pace, dy: dir.dy * 320 * GameScene.pace)
             }
             for w in wells {
                 let dx = w.position.x - drop.position.x, dy = w.position.y - drop.position.y
                 let d = hypot(dx, dy)
                 let radius: CGFloat = 130
                 guard d < radius, d > 4 else { continue }
-                let strength: CGFloat = 1500 * (1 - d / radius) + 200
+                let strength: CGFloat = (1500 * (1 - d / radius) + 200) * GameScene.pace * GameScene.pace
                 var v = body.velocity
                 v.dx += dx / d * strength * dt
                 v.dy += dy / d * strength * dt
                 let s = hypot(v.dx, v.dy)
-                if s > 720 { v.dx *= 720 / s; v.dy *= 720 / s }
+                let cap = 720 * GameScene.pace
+                if s > cap { v.dx *= cap / s; v.dy *= cap / s }
                 body.velocity = v
             }
         }
@@ -335,7 +338,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         drop.physicsBody = body
         dropLayer.addChild(drop)
         let perp = CGFloat.random(in: -6...6)
-        body.velocity = CGVector(dx: dir.dx * spec.speed - dir.dy * perp, dy: dir.dy * spec.speed + dir.dx * perp)
+        body.velocity = CGVector(dx: (dir.dx * spec.speed - dir.dy * perp) * GameScene.pace, dy: (dir.dy * spec.speed + dir.dx * perp) * GameScene.pace)
     }
 
     // MARK: Contacts

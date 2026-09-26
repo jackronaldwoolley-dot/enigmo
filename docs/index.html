@@ -5,7 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#0D121F">
 <meta name="description" content="Enigmo tribute: steer water, oil, and lava into buckets with bumpers, sliders, sponges, accelerators, and gravity wells.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%234DADFF'/%3E%3Ccircle cx='32' cy='32' r='12' fill='%23B3E0FF'/%3E%3C/svg%3E">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Enigmo">
 <style>html { padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); background: #070A12; }</style>
 <title>Enigmo</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap">
@@ -249,7 +255,7 @@ const LEVELS = [
   { name: 'Rain', hint: 'Three streams, one bucket. The middle one is blocked.', D: [[.20,.93,-90,40,'water'],[.50,.93,-90,40,'water'],[.80,.93,-90,40,'water']], C: [[.50,.04,'water']], W: [[.40,.24,.20,.03]], tools: { slider: 4, bumper: 2, gravity: 1 }, target: 60, par: 90 },
   { name: 'Grand Finale', hint: 'Everything at once. Breathe. One liquid at a time.', D: [[.10,.93,-90,40,'water'],[.90,.93,-90,40,'lava'],[.50,.06,90,500,'oil']], C: [[.75,.04,'water'],[.25,.04,'lava'],[.50,.45,'oil']], W: [[.38,.39,.24,.06],[.48,0,.04,.25]], tools: { slider: 4, bumper: 3, sponge: 1, accelerator: 1, gravity: 1 }, target: 25, par: 160 },
 ];
-LEVELS.forEach(l => { l.parts = Object.values(l.tools).reduce((a, b) => a + b, 0); l.liquids = new Set(l.D.map(d => d[4])).size; l.total = l.target * l.C.length; });
+LEVELS.forEach(l => { l.par = Math.round(l.par / PACE); l.parts = Object.values(l.tools).reduce((a, b) => a + b, 0); l.liquids = new Set(l.D.map(d => d[4])).size; l.total = l.target * l.C.length; });
 const chapterOf = i => CHAPTERS.find(c => i >= c.from && i < c.to) || CHAPTERS[0];
 
 const ACH = [
@@ -313,7 +319,9 @@ const Sound = {
 const LW = 402, HUD = 62, TRAY = 92, PLAY_H = 627, LH = HUD + PLAY_H + TRAY;
 const PLAY = { x: 0, y: HUD, w: LW, h: PLAY_H, bottom: HUD + PLAY_H };
 const px = fx => fx * LW, py = fy => PLAY.bottom - fy * PLAY_H;
-const G = 390, R = 4, MAX_DROPS = 120, HOVER = 40;
+// PACE scales the whole simulation. 0.8 = droplets move 20% slower along the same paths.
+const PACE = 0.8;
+const G = 390 * PACE * PACE, R = 4, MAX_DROPS = 120, HOVER = 40, EMIT = 0.24 / PACE;
 const CW = 46, CH = 56;
 
 // ---------- Scene ----------
@@ -335,20 +343,20 @@ const scene = {
     const dir = { x: Math.cos(d.a), y: -Math.sin(d.a) };
     const j = (Math.random() - .5) * 3, perp = (Math.random() - .5) * 12;
     const ex = d.x + dir.x * 8, ey = d.y + dir.y * 8;
-    this.drops.push({ x: ex + dir.x * 4 - dir.y * j, y: ey + dir.y * 4 + dir.x * j, vx: dir.x * d.s - dir.y * perp, vy: dir.y * d.s + dir.x * perp, kind: d.kind, born: this.elapsed, idle: 0, dead: false });
+    this.drops.push({ x: ex + dir.x * 4 - dir.y * j, y: ey + dir.y * 4 + dir.x * j, vx: (dir.x * d.s - dir.y * perp) * PACE, vy: (dir.y * d.s + dir.x * perp) * PACE, kind: d.kind, born: this.elapsed, idle: 0, dead: false });
   },
   puff(x, y, color, big) { this.puffs.push({ x, y, color, big, t: 0 }); },
   step(dt) {
     if (!this.running) return;
     this.elapsed += dt;
-    for (const d of this.droppers) { d.acc += dt; while (d.acc >= .24) { d.acc -= .24; if (this.drops.length < MAX_DROPS) this.emit(d); } }
+    for (const d of this.droppers) { d.acc += dt; while (d.acc >= EMIT) { d.acc -= EMIT; if (this.drops.length < MAX_DROPS) this.emit(d); } }
     const accels = this.tools.filter(t => t.kind === 'accelerator'), wells = this.tools.filter(t => t.kind === 'gravity');
     const sub = 4, h = dt / sub;
     for (let s = 0; s < sub; s++) {
       for (const p of this.drops) {
         if (p.dead) continue;
-        for (const w of wells) { const dx = w.x - p.x, dy = w.y - p.y, d = Math.hypot(dx, dy); if (d < 130 && d > 4) { const k = (1500 * (1 - d / 130) + 200) * h; p.vx += dx / d * k; p.vy += dy / d * k; const sp = Math.hypot(p.vx, p.vy); if (sp > 720) { p.vx *= 720 / sp; p.vy *= 720 / sp; } } }
-        for (const a of accels) { if (Math.hypot(p.x - a.x, p.y - a.y) < 20) { const u = up(a); p.vx = u.x * 320; p.vy = u.y * 320; } }
+        for (const w of wells) { const dx = w.x - p.x, dy = w.y - p.y, d = Math.hypot(dx, dy); if (d < 130 && d > 4) { const k = (1500 * (1 - d / 130) + 200) * PACE * PACE * h; p.vx += dx / d * k; p.vy += dy / d * k; const sp = Math.hypot(p.vx, p.vy), cap = 720 * PACE; if (sp > cap) { p.vx *= cap / sp; p.vy *= cap / sp; } } }
+        for (const a of accels) { if (Math.hypot(p.x - a.x, p.y - a.y) < 20) { const u = up(a); p.vx = u.x * 320 * PACE; p.vy = u.y * 320 * PACE; } }
         p.vy += G * h; p.vx *= (1 - .02 * h); p.vy *= (1 - .02 * h);
         p.x += p.vx * h; p.y += p.vy * h;
         // boundary
@@ -376,7 +384,7 @@ const scene = {
     for (const p of this.drops) {
       if (p.dead) continue;
       if (p.y > PLAY.bottom + 2 || this.elapsed - p.born > 30) { p.dead = true; continue; }
-      const sp = Math.hypot(p.vx, p.vy); p.idle = sp < 6 ? p.idle + dt : 0;
+      const sp = Math.hypot(p.vx, p.vy); p.idle = sp < 6 * PACE ? p.idle + dt : 0;
       if (p.idle > 1.6) { p.dead = true; this.puff(p.x, p.y, KIND[p.kind].color, false); }
     }
     this.drops = this.drops.filter(p => !p.dead);

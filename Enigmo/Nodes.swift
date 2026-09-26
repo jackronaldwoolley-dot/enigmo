@@ -358,7 +358,7 @@ final class ContainerNode: SKNode {
 final class DropperNode: SKNode {
     let spec: DropperSpec
     var accumulator: TimeInterval = 0
-    let interval: TimeInterval = 0.24
+    let interval: TimeInterval = 0.24 / Double(GameScene.pace)
 
     init(spec: DropperSpec) {
         self.spec = spec

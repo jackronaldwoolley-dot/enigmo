@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1B2440"/>
+      <stop offset="1" stop-color="#0A0E1B"/>
+    </linearGradient>
+    <linearGradient id="drop" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#8FD6FF"/>
+      <stop offset="0.55" stop-color="#3FA3FF"/>
+      <stop offset="1" stop-color="#1F6BE0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.55" r="0.5">
+      <stop offset="0" stop-color="#4DADFF" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#4DADFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="slider" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#B9EBF0"/>
+      <stop offset="1" stop-color="#7FCBD6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <g stroke="#FFFFFF" stroke-opacity="0.045" stroke-width="3">
+    <path d="M128 0V1024M256 0V1024M384 0V1024M512 0V1024M640 0V1024M768 0V1024M896 0V1024M0 128H1024M0 256H1024M0 384H1024M0 512H1024M0 640H1024M0 768H1024M0 896H1024"/>
+  </g>
+  <circle cx="512" cy="540" r="440" fill="url(#glow)"/>
+  <!-- slider the droplet is about to land on -->
+  <g transform="rotate(-12 512 830)">
+    <rect x="232" y="812" width="560" height="52" rx="26" fill="url(#slider)"/>
+    <rect x="262" y="864" width="500" height="12" rx="6" fill="#3E7F8C"/>
+  </g>
+  <!-- droplet -->
+  <path d="M512 150 C 470 260, 300 420, 300 590 A 212 212 0 0 0 724 590 C 724 420, 554 260, 512 150 Z" fill="url(#drop)"/>
+  <path d="M512 150 C 470 260, 300 420, 300 590 A 212 212 0 0 0 724 590 C 724 420, 554 260, 512 150 Z" fill="none" stroke="#DDF3FF" stroke-width="10" stroke-opacity="0.9"/>
+  <!-- highlight -->
+  <ellipse cx="410" cy="470" rx="46" ry="92" transform="rotate(-18 410 470)" fill="#FFFFFF" fill-opacity="0.55"/>
+  <circle cx="450" cy="352" r="22" fill="#FFFFFF" fill-opacity="0.6"/>
+  <!-- face -->
+  <ellipse cx="452" cy="600" rx="30" ry="42" fill="#0B1F3F"/>
+  <ellipse cx="572" cy="600" rx="30" ry="42" fill="#0B1F3F"/>
+  <circle cx="462" cy="584" r="10" fill="#FFFFFF"/>
+  <circle cx="582" cy="584" r="10" fill="#FFFFFF"/>
+  <path d="M458 676 Q 512 726 566 676" fill="none" stroke="#0B1F3F" stroke-width="18" stroke-linecap="round"/>
+  <ellipse cx="402" cy="652" rx="30" ry="16" fill="#FF8AA8" fill-opacity="0.55"/>
+  <ellipse cx="622" cy="652" rx="30" ry="16" fill="#FF8AA8" fill-opacity="0.55"/>
+  <!-- gold star sparkle -->
+  <path d="M790 250 L806 298 L856 298 L816 328 L832 376 L790 346 L748 376 L764 328 L724 298 L774 298 Z" fill="#FFD966"/>
+  <path d="M230 300 L238 322 L260 322 L242 336 L250 358 L230 344 L210 358 L218 336 L200 322 L222 322 Z" fill="#FFD966" fill-opacity="0.8"/>
+</svg>
