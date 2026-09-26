@@ -483,7 +483,7 @@ struct WinView: View {
                     HStack(spacing: 0) {
                         stat("TIME", r.elapsed.clock, sub: "par \(r.par.clock)")
                         stat("PARTS", "\(r.partsUsed)", sub: "of \(r.partsAvailable)")
-                        stat("BONUS", "\(r.bonus)", sub: r.isNewBest ? "new best" : " ")
+                        stat("BONUS", r.bonus.formatted(), sub: r.isNewBest ? "new best" : " ")
                     }
                     .padding(.vertical, 6)
 
@@ -526,7 +526,7 @@ struct AchievementsView: View {
             List {
                 Section {
                     HStack(spacing: 0) {
-                        statTile("Drops caught", "\(model.progress.stats.drops)")
+                        statTile("Drops caught", model.progress.stats.drops.formatted())
                         statTile("Levels done", "\(model.progress.stats.levelsCompleted)/\(Level.all.count)")
                         statTile("Play time", (model.progress.stats.playSeconds).clock)
                     }
