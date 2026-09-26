@@ -145,6 +145,8 @@
   .row .when { font-size: 10px; font-weight: 800; color: rgba(255,217,102,.8); }
   .row .check { color: var(--gold); font-size: 18px; }
   .row.toggle { justify-content: space-between; }
+  .row .thumb { width: 48px; height: 48px; flex: 0 0 auto; border-radius: 10px; background: rgba(255,255,255,.06); }
+  .row.hl { background: rgba(255,217,102,.10); box-shadow: inset 3px 0 0 var(--gold); }
   .switch { width: 50px; height: 30px; border-radius: 15px; background: rgba(255,255,255,.15); position: relative; transition: background .2s; flex: 0 0 auto; }
   .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform .2s; }
   .switch.on { background: var(--gold); } .switch.on::after { transform: translateX(20px); }
@@ -197,7 +199,8 @@
           <span><i style="color:var(--oil);background:var(--oil)"></i>Oil</span>
           <span><i style="color:var(--lava);background:var(--lava)"></i>Lava</span>
         </div>
-        <p class="note">Each bucket takes one liquid. A wrong droplet costs you one you've already caught. Drag parts from the tray, tap one and drag its knob to rotate it, drag it back to the tray to return it.</p>
+        <p class="note">Each bucket takes one liquid. A wrong droplet costs you one you've already caught.</p>
+        <div style="display:flex;justify-content:center;padding-top:12px"><button class="pill" id="btnParts">📖 How the parts work</button></div>
       </div>
       <button id="continue"><span><span class="eyebrow" id="contK">Start</span><br><span class="lvl" id="contL">Level 1 · First Drop</span></span><span>▶</span></button>
     </div>
@@ -211,6 +214,8 @@
 <script>
 (() => {
 'use strict';
+// PACE scales the whole simulation. 0.8 = droplets move 20% slower along the same paths.
+const PACE = 0.8;
 
 // ---------- Data ----------
 const KIND = { water: { color: '#4DADFF', light: '#B3E0FF', name: 'Water' }, oil: { color: '#C7B24D', light: '#F2E699', name: 'Oil' }, lava: { color: '#FF6629', light: '#FFC78C', name: 'Lava' } };
@@ -220,8 +225,24 @@ const TOOL = {
   sponge: { title: 'Sponge', w: 66, h: 16, color: '#F5C842', stroke: '#FFE68C', blurb: 'Soaks up any droplet that touches it.' },
   accelerator: { title: 'Accel', w: 44, h: 44, color: '#FF8C33', stroke: '#FFD9A6', blurb: 'Fires droplets along its arrow.' },
   gravity: { title: 'Gravity', w: 40, h: 40, color: '#D973FF', stroke: '#FFFFFF', blurb: 'Pulls nearby droplets toward it.' },
+  splitter: { title: 'Splitter', w: 64, h: 28, color: '#7BE0A8', stroke: '#D6FFE9', blurb: 'A wedge that divides a stream in two.' },
+  fan: { title: 'Fan', w: 40, h: 40, color: '#A6F26B', stroke: '#E9FFD1', blurb: 'Blows a steady breeze along its arrow.' },
+  portal: { title: 'Portal', w: 36, h: 36, color: '#FF5DA2', stroke: '#FFD1E6', blurb: 'Droplets entering the IN ring leave from the OUT ring.' },
+  repeller: { title: 'Repel', w: 40, h: 40, color: '#E8EEFF', stroke: '#FFFFFF', blurb: 'Pushes nearby droplets away.' },
 };
-const TOOL_ORDER = ['bumper', 'slider', 'sponge', 'accelerator', 'gravity'];
+const TOOL_ORDER = ['bumper', 'slider', 'sponge', 'accelerator', 'gravity', 'splitter', 'fan', 'portal', 'repeller'];
+const FULL_NAME = { bumper: 'Bumper', slider: 'Slider', sponge: 'Sponge', accelerator: 'Accelerator', gravity: 'Gravity Well', splitter: 'Splitter', fan: 'Fan', portal: 'Portal', repeller: 'Repeller' };
+const GUIDE = {
+  bumper: { does: 'Bouncy. Droplets rebound off it at full speed.', tip: 'A tiny tilt sends the stream a long way. Drag the knob far from the part for fine angles.' },
+  slider: { does: 'Slick. Droplets land softly and glide along it.', tip: 'The safest way to steer a stream sideways.' },
+  sponge: { does: 'Soaks up every droplet that touches it.', tip: 'Park it in a stream you don\'t want, like oil headed for a water bucket.' },
+  accelerator: { does: 'Fires droplets along its arrow at full speed the moment they touch it.', tip: 'Shoots a stream under a roof or across a gap.' },
+  gravity: { does: 'Pulls nearby droplets toward it, bending their path.', tip: 'Place it beside the stream, not in it, to curve the flow.' },
+  splitter: { does: 'A wedge that divides a stream in two.', tip: 'Aim the point at the middle of the flow to feed two buckets at once.' },
+  fan: { does: 'Blows a steady breeze along its arrow, pushing droplets in front of it.', tip: 'Gentler than an Accelerator and works over a distance. Use it to nudge a stream sideways.' },
+  portal: { does: 'Droplets that enter the IN ring come out of the OUT ring, flying along its arrow.', tip: 'Move and rotate each ring on its own. Dragging either ring to the tray removes both.' },
+  repeller: { does: 'Pushes nearby droplets away from it.', tip: 'Park it where the stream shouldn\'t go, or use it as a soft wall.' },
+};
 const CHAPTERS = [
   { id: 0, name: 'First Drops', tagline: 'Learn the parts. Fill the buckets.', stars: 0, from: 0, to: 6 },
   { id: 1, name: 'Mixing It Up', tagline: 'Two liquids, tighter spaces, new tricks.', stars: 8, from: 6, to: 12 },
@@ -233,27 +254,27 @@ const LEVELS = [
   { name: 'First Drop', hint: 'Drag a Slider under the stream, then tilt it toward the bucket.', D: [[.22,.93,-90,40,'water']], C: [[.78,.04,'water']], W: [], tools: { slider: 2, bumper: 1 }, target: 40, par: 30 },
   { name: 'Over the Wall', hint: 'Bumpers bounce droplets back at full speed. A tiny tilt goes a long way.', D: [[.16,.93,-90,40,'water']], C: [[.80,.04,'water']], W: [[.48,0,.04,.52]], tools: { bumper: 2, slider: 1 }, target: 40, par: 35 },
   { name: 'Up and Over', hint: 'The bucket sits on a ledge. Bounce the stream up to it.', D: [[.40,.95,-90,40,'water']], C: [[.85,.50,'water']], W: [[.70,.44,.30,.06]], tools: { bumper: 2, slider: 2 }, target: 40, par: 45 },
-  { name: 'Staircase', hint: 'Droplets that stop moving evaporate. Keep the stream flowing.', D: [[.10,.93,-90,40,'water']], C: [[.86,.04,'water']], W: [[0,.62,.28,.03],[.36,.40,.28,.03]], tools: { slider: 3, bumper: 1 }, target: 40, par: 45 },
+  { name: 'Staircase', hint: 'New part: the Splitter wedge parts a stream in two. Here, use it or ignore it.', D: [[.10,.93,-90,40,'water']], C: [[.86,.04,'water']], W: [[0,.62,.28,.03],[.36,.40,.28,.03]], tools: { slider: 3, bumper: 1, splitter: 1 }, target: 40, par: 45 },
   { name: 'Sponge Bath', hint: 'Wrong liquids poison a bucket. Sponge the oil before it gets there.', D: [[.32,.93,-90,40,'water'],[.52,.93,-90,40,'oil']], C: [[.50,.04,'water']], W: [[0,0,.22,.30]], tools: { sponge: 2, slider: 2, bumper: 1 }, target: 40, par: 50 },
-  { name: 'Lava Lamp', hint: 'Accelerators fling droplets in the direction of the arrow.', D: [[.08,.55,0,180,'lava']], C: [[.88,.04,'lava']], W: [[.60,.30,.40,.05],[.30,0,.05,.22]], tools: { slider: 2, accelerator: 1, bumper: 1 }, target: 40, par: 50 },
+  { name: 'Lava Lamp', hint: 'Accelerators fling droplets along the arrow. The Fan does it gently, over a distance.', D: [[.08,.55,0,180,'lava']], C: [[.88,.04,'lava']], W: [[.60,.30,.40,.05],[.30,0,.05,.22]], tools: { slider: 2, accelerator: 1, fan: 1, bumper: 1 }, target: 40, par: 50 },
   { name: 'Oil and Water', hint: 'Cross the streams. Each bucket takes only its own liquid.', D: [[.15,.93,-90,40,'water'],[.85,.93,-90,40,'oil']], C: [[.70,.04,'water'],[.30,.04,'oil']], W: [[.48,0,.04,.40]], tools: { bumper: 2, slider: 3, sponge: 1 }, target: 25, par: 70 },
-  { name: 'Crossfire', hint: 'Two jets, two buckets. Sliders can catch a fast stream.', D: [[.06,.62,0,230,'water'],[.94,.62,180,230,'lava']], C: [[.84,.04,'water'],[.16,.04,'lava']], W: [[.47,0,.06,.32]], tools: { bumper: 3, slider: 2, sponge: 1, accelerator: 1 }, target: 30, par: 70 },
+  { name: 'Crossfire', hint: 'Two jets, two buckets. A Repeller shoves droplets away, like a soft wall.', D: [[.06,.62,0,230,'water'],[.94,.62,180,230,'lava']], C: [[.84,.04,'water'],[.16,.04,'lava']], W: [[.47,0,.06,.32]], tools: { bumper: 3, slider: 2, sponge: 1, repeller: 1 }, target: 30, par: 70 },
   { name: 'Fountain', hint: 'This one shoots up. Catch it on the way down.', D: [[.50,.06,90,470,'oil']], C: [[.15,.58,'oil']], W: [[0,.52,.30,.06]], tools: { bumper: 2, slider: 2, accelerator: 1, sponge: 1 }, target: 40, par: 60 },
   { name: 'Pull of Gravity', hint: 'A Gravity Well bends the stream toward it. Place it beside the flow, not in it.', D: [[.28,.93,-90,40,'water']], C: [[.80,.04,'water']], W: [[.40,0,.04,.18]], tools: { gravity: 1, slider: 1 }, target: 40, par: 50 },
-  { name: 'The Gauntlet', hint: 'Thread the needle. Every gap is wider than it looks.', D: [[.50,.95,-90,40,'water']], C: [[.50,.04,'water']], W: [[.30,.70,.40,.03],[0,.45,.36,.03],[.64,.45,.36,.03],[.34,.22,.32,.03]], tools: { bumper: 2, slider: 3, accelerator: 1 }, target: 40, par: 70 },
-  { name: 'Split Decision', hint: 'One stream, two buckets. Catch the edge of the stream to split it.', D: [[.50,.93,-90,40,'water']], C: [[.14,.04,'water'],[.86,.04,'water']], W: [[.48,0,.04,.30]], tools: { bumper: 2, slider: 3 }, target: 20, par: 80 },
+  { name: 'The Gauntlet', hint: 'Thread the needle, or skip it: Portals teleport droplets from the IN ring to the OUT ring.', D: [[.50,.95,-90,40,'water']], C: [[.50,.04,'water']], W: [[.30,.70,.40,.03],[0,.45,.36,.03],[.64,.45,.36,.03],[.34,.22,.32,.03]], tools: { bumper: 2, slider: 3, accelerator: 1, portal: 1 }, target: 40, par: 70 },
+  { name: 'Split Decision', hint: 'One stream, two buckets. Point the Splitter at the middle of the flow.', D: [[.50,.93,-90,40,'water']], C: [[.14,.04,'water'],[.86,.04,'water']], W: [[.48,0,.04,.30]], tools: { splitter: 1, bumper: 2, slider: 3 }, target: 20, par: 80 },
   { name: 'Tight Squeeze', hint: 'Funnel the stream through the gap, then steer it home.', D: [[.50,.95,-90,40,'water']], C: [[.20,.04,'water']], W: [[0,.55,.42,.03],[.58,.55,.42,.03],[.34,0,.04,.30]], tools: { slider: 3, bumper: 1 }, target: 40, par: 60 },
   { name: 'Triple Threat', hint: 'Three streams, three buckets, all shuffled. Work one liquid at a time.', D: [[.20,.93,-90,40,'water'],[.50,.93,-90,40,'oil'],[.80,.93,-90,40,'lava']], C: [[.20,.04,'lava'],[.50,.04,'water'],[.80,.04,'oil']], W: [], tools: { slider: 4, bumper: 3, sponge: 1 }, target: 20, par: 110 },
-  { name: 'Under the Roof', hint: 'The bucket is covered. Come in low and from the side.', D: [[.20,.93,-90,40,'water']], C: [[.82,.04,'water']], W: [[.62,.22,.38,.04]], tools: { accelerator: 1, slider: 2, bumper: 1 }, target: 40, par: 70 },
+  { name: 'Under the Roof', hint: 'The bucket is covered. Come in low and from the side.', D: [[.20,.93,-90,40,'water']], C: [[.82,.04,'water']], W: [[.62,.22,.38,.04]], tools: { accelerator: 1, fan: 1, slider: 2, bumper: 1 }, target: 40, par: 70 },
   { name: 'Sideways', hint: 'Only water belongs in this bucket. Clear the oil out of the lane.', D: [[.05,.85,0,260,'water'],[.95,.70,180,260,'oil']], C: [[.88,.04,'water']], W: [], tools: { sponge: 2, slider: 2, bumper: 1 }, target: 40, par: 70 },
-  { name: 'Pinball', hint: 'Pegs everywhere. Use them, or bounce around them.', D: [[.50,.95,-90,40,'water']], C: [[.50,.04,'water']], W: [[.47,.72,.06,.03],[.62,.60,.06,.03],[.36,.50,.06,.03],[.20,.38,.06,.03],[.66,.34,.06,.03],[.44,.20,.12,.03]], tools: { bumper: 3, slider: 2 }, target: 40, par: 70 },
+  { name: 'Pinball', hint: 'Pegs everywhere. Use them, or bounce around them.', D: [[.50,.95,-90,40,'water']], C: [[.50,.04,'water']], W: [[.47,.72,.06,.03],[.62,.60,.06,.03],[.36,.50,.06,.03],[.20,.38,.06,.03],[.66,.34,.06,.03],[.44,.20,.12,.03]], tools: { bumper: 3, slider: 2, repeller: 1 }, target: 40, par: 70 },
   { name: 'Orbit', hint: 'The bucket sits in a pit. Let gravity pull the jet down into it.', D: [[.08,.62,0,210,'lava']], C: [[.50,.04,'lava']], W: [[.30,0,.05,.45],[.65,0,.05,.45]], tools: { gravity: 2, slider: 1, bumper: 1 }, target: 40, par: 80 },
-  { name: 'Long Way Round', hint: 'Straight down is blocked. Go around and slip in from the side.', D: [[.90,.93,-90,40,'water']], C: [[.88,.04,'water']], W: [[.60,.50,.40,.04],[.72,.20,.28,.04]], tools: { slider: 3, bumper: 2, accelerator: 1 }, target: 40, par: 90 },
-  { name: 'Fire and Water', hint: 'Lava from the side, water from above. Keep them apart.', D: [[.50,.93,-90,40,'water'],[.05,.50,0,200,'lava']], C: [[.85,.04,'water'],[.15,.04,'lava']], W: [[.48,0,.04,.35]], tools: { bumper: 2, slider: 3, sponge: 1, gravity: 1 }, target: 30, par: 100 },
+  { name: 'Long Way Round', hint: 'Straight down is blocked. Go around and slip in from the side.', D: [[.90,.93,-90,40,'water']], C: [[.88,.04,'water']], W: [[.60,.50,.40,.04],[.72,.20,.28,.04]], tools: { slider: 3, bumper: 2, accelerator: 1, portal: 1 }, target: 40, par: 90 },
+  { name: 'Fire and Water', hint: 'Lava from the side, water from above. Keep them apart.', D: [[.50,.93,-90,40,'water'],[.05,.50,0,200,'lava']], C: [[.85,.04,'water'],[.15,.04,'lava']], W: [[.48,0,.04,.35]], tools: { bumper: 2, slider: 3, sponge: 1, gravity: 1, fan: 1 }, target: 30, par: 100 },
   { name: 'High Rise', hint: 'Shoot for the ledge. Trim the arc with a bumper.', D: [[.12,.06,80,560,'oil']], C: [[.50,.55,'oil']], W: [[.35,.49,.30,.06]], tools: { bumper: 2, slider: 2, accelerator: 1 }, target: 40, par: 90 },
-  { name: 'Four Corners', hint: 'Both streams have to cross under the bar. Stack your sliders at different heights.', D: [[.08,.93,-90,40,'water'],[.92,.93,-90,40,'oil']], C: [[.92,.04,'water'],[.08,.04,'oil']], W: [[.48,.30,.04,.70],[.20,.30,.60,.04]], tools: { slider: 4, bumper: 2, sponge: 1, accelerator: 1 }, target: 25, par: 120 },
-  { name: 'Rain', hint: 'Three streams, one bucket. The middle one is blocked.', D: [[.20,.93,-90,40,'water'],[.50,.93,-90,40,'water'],[.80,.93,-90,40,'water']], C: [[.50,.04,'water']], W: [[.40,.24,.20,.03]], tools: { slider: 4, bumper: 2, gravity: 1 }, target: 60, par: 90 },
-  { name: 'Grand Finale', hint: 'Everything at once. Breathe. One liquid at a time.', D: [[.10,.93,-90,40,'water'],[.90,.93,-90,40,'lava'],[.50,.06,90,500,'oil']], C: [[.75,.04,'water'],[.25,.04,'lava'],[.50,.45,'oil']], W: [[.38,.39,.24,.06],[.48,0,.04,.25]], tools: { slider: 4, bumper: 3, sponge: 1, accelerator: 1, gravity: 1 }, target: 25, par: 160 },
+  { name: 'Four Corners', hint: 'Both streams have to cross under the bar. Stack your sliders at different heights.', D: [[.08,.93,-90,40,'water'],[.92,.93,-90,40,'oil']], C: [[.92,.04,'water'],[.08,.04,'oil']], W: [[.48,.30,.04,.70],[.20,.30,.60,.04]], tools: { slider: 4, bumper: 2, sponge: 1, accelerator: 1, repeller: 1 }, target: 25, par: 120 },
+  { name: 'Rain', hint: 'Three streams, one bucket. The middle one is blocked.', D: [[.20,.93,-90,40,'water'],[.50,.93,-90,40,'water'],[.80,.93,-90,40,'water']], C: [[.50,.04,'water']], W: [[.40,.24,.20,.03]], tools: { slider: 4, bumper: 2, gravity: 1, splitter: 1 }, target: 60, par: 90 },
+  { name: 'Grand Finale', hint: 'Everything at once. Breathe. One liquid at a time.', D: [[.10,.93,-90,40,'water'],[.90,.93,-90,40,'lava'],[.50,.06,90,500,'oil']], C: [[.75,.04,'water'],[.25,.04,'lava'],[.50,.45,'oil']], W: [[.38,.39,.24,.06],[.48,0,.04,.25]], tools: { slider: 4, bumper: 3, sponge: 1, accelerator: 1, gravity: 1, portal: 1, fan: 1 }, target: 25, par: 160 },
 ];
 LEVELS.forEach(l => { l.par = Math.round(l.par / PACE); l.parts = Object.values(l.tools).reduce((a, b) => a + b, 0); l.liquids = new Set(l.D.map(d => d[4])).size; l.total = l.target * l.C.length; });
 const chapterOf = i => CHAPTERS.find(c => i >= c.from && i < c.to) || CHAPTERS[0];
@@ -280,7 +301,7 @@ const ACH = [
 // ---------- Persistence ----------
 const KEY = 'enigmo.web.v1';
 function loadProgress() {
-  const base = { records: {}, achievements: {}, stats: { drops: 0, byKind: {}, absorbed: 0, contaminations: 0, partsPlaced: 0, resets: 0, levelsCompleted: 0, playSeconds: 0 }, tutorialDone: false, soundOn: true };
+  const base = { records: {}, achievements: {}, stats: { drops: 0, byKind: {}, absorbed: 0, contaminations: 0, partsPlaced: 0, resets: 0, levelsCompleted: 0, playSeconds: 0 }, tutorialDone: false, soundOn: true, seenParts: [] };
   try { const raw = localStorage.getItem(KEY); if (raw) { const p = JSON.parse(raw); return { ...base, ...p, stats: { ...base.stats, ...(p.stats || {}) } }; } } catch (e) {}
   return base;
 }
@@ -319,8 +340,6 @@ const Sound = {
 const LW = 402, HUD = 62, TRAY = 92, PLAY_H = 627, LH = HUD + PLAY_H + TRAY;
 const PLAY = { x: 0, y: HUD, w: LW, h: PLAY_H, bottom: HUD + PLAY_H };
 const px = fx => fx * LW, py = fy => PLAY.bottom - fy * PLAY_H;
-// PACE scales the whole simulation. 0.8 = droplets move 20% slower along the same paths.
-const PACE = 0.8;
 const G = 390 * PACE * PACE, R = 4, MAX_DROPS = 120, HOVER = 40, EMIT = 0.24 / PACE;
 const CW = 46, CH = 56;
 
@@ -328,7 +347,7 @@ const CW = 46, CH = 56;
 const scene = {
   level: null, running: false, elapsed: 0, lastTick: 0,
   drops: [], tools: [], droppers: [], containers: [], walls: [], puffs: [], counts: {}, slots: [],
-  selected: null, drag: null, sprites: {},
+  selected: null, drag: null, sprites: {}, pairSeq: 0,
   load(level) {
     this.level = level; this.running = true; this.elapsed = 0; this.lastTick = 0;
     this.drops = []; this.tools = []; this.puffs = []; this.selected = null; this.drag = null;
@@ -343,7 +362,7 @@ const scene = {
     const dir = { x: Math.cos(d.a), y: -Math.sin(d.a) };
     const j = (Math.random() - .5) * 3, perp = (Math.random() - .5) * 12;
     const ex = d.x + dir.x * 8, ey = d.y + dir.y * 8;
-    this.drops.push({ x: ex + dir.x * 4 - dir.y * j, y: ey + dir.y * 4 + dir.x * j, vx: (dir.x * d.s - dir.y * perp) * PACE, vy: (dir.y * d.s + dir.x * perp) * PACE, kind: d.kind, born: this.elapsed, idle: 0, dead: false });
+    this.drops.push({ x: ex + dir.x * 4 - dir.y * j, y: ey + dir.y * 4 + dir.x * j, vx: (dir.x * d.s - dir.y * perp) * PACE, vy: (dir.y * d.s + dir.x * perp) * PACE, kind: d.kind, born: this.elapsed, idle: 0, tp: 0, dead: false });
   },
   puff(x, y, color, big) { this.puffs.push({ x, y, color, big, t: 0 }); },
   step(dt) {
@@ -351,12 +370,19 @@ const scene = {
     this.elapsed += dt;
     for (const d of this.droppers) { d.acc += dt; while (d.acc >= EMIT) { d.acc -= EMIT; if (this.drops.length < MAX_DROPS) this.emit(d); } }
     const accels = this.tools.filter(t => t.kind === 'accelerator'), wells = this.tools.filter(t => t.kind === 'gravity');
+    const fans = this.tools.filter(t => t.kind === 'fan'), repellers = this.tools.filter(t => t.kind === 'repeller');
+    const portalsIn = this.tools.filter(t => t.kind === 'portal' && t.role === 'in');
+    const wedges = []; for (const t of this.tools) if (t.kind === 'splitter') wedges.push(...wedgeFaces(t));
     const sub = 4, h = dt / sub;
     for (let s = 0; s < sub; s++) {
       for (const p of this.drops) {
         if (p.dead) continue;
         for (const w of wells) { const dx = w.x - p.x, dy = w.y - p.y, d = Math.hypot(dx, dy); if (d < 130 && d > 4) { const k = (1500 * (1 - d / 130) + 200) * PACE * PACE * h; p.vx += dx / d * k; p.vy += dy / d * k; const sp = Math.hypot(p.vx, p.vy), cap = 720 * PACE; if (sp > cap) { p.vx *= cap / sp; p.vy *= cap / sp; } } }
         for (const a of accels) { if (Math.hypot(p.x - a.x, p.y - a.y) < 20) { const u = up(a); p.vx = u.x * 320 * PACE; p.vy = u.y * 320 * PACE; } }
+        for (const w of repellers) { const dx = p.x - w.x, dy = p.y - w.y, d = Math.hypot(dx, dy); if (d < 110 && d > 2) { const k = (1300 * (1 - d / 110) + 150) * PACE * PACE * h; p.vx += dx / d * k; p.vy += dy / d * k; } }
+        for (const f of fans) { const l = local(f, p.x, p.y); if (l.y < -18 && l.y > -170 && Math.abs(l.x) < 36) { const u = up(f), k = 1100 * (1 - (-l.y - 18) / 152) * PACE * PACE * h; p.vx += u.x * k; p.vy += u.y * k; } }
+        if (p.tp > 0) p.tp -= h;
+        else for (const a of portalsIn) { if (Math.hypot(p.x - a.x, p.y - a.y) < 15) { const b = this.tools.find(t => t.kind === 'portal' && t.role === 'out' && t.pair === a.pair); if (!b) break; const u = up(b), sp = Math.max(Math.hypot(p.vx, p.vy), 140 * PACE); p.x = b.x + u.x * 22; p.y = b.y + u.y * 22; p.vx = u.x * sp; p.vy = u.y * sp; p.tp = .35; this.puff(a.x, a.y, TOOL.portal.color, false); break; } }
         p.vy += G * h; p.vx *= (1 - .02 * h); p.vy *= (1 - .02 * h);
         p.x += p.vx * h; p.y += p.vy * h;
         // boundary
@@ -364,6 +390,7 @@ const scene = {
         if (p.x > LW - R) { p.x = LW - R; if (p.vx > 0) p.vx = -p.vx * .2; }
         if (p.y < PLAY.y + R) { p.y = PLAY.y + R; if (p.vy < 0) p.vy = -p.vy * .2; }
         for (const w of this.walls) collide(p, w);
+        for (const f of wedges) collide(p, f, .1, 0);
         for (const t of this.tools) {
           if (t.kind === 'bumper') collide(p, t, 1, 0);
           else if (t.kind === 'slider') collide(p, t, 0, 0);
@@ -396,7 +423,7 @@ const scene = {
   checkWin() {
     if (!this.running || !this.containers.every(c => c.count >= c.target)) return;
     this.running = false; this.selected = null; this.drag = null;
-    const time = this.elapsed, used = this.tools.length, kinds = new Set(this.tools.map(t => t.kind));
+    const time = this.elapsed, used = this.tools.filter(t => t.role !== 'out').length, kinds = new Set(this.tools.map(t => t.kind));
     for (const c of this.containers) for (let i = 0; i < 12; i++) setTimeout(() => this.puff(c.x + (Math.random() - .5) * 44, c.y - 10 - Math.random() * 54, KIND[c.kind].light, true), i * 50);
     this.drops = [];
     setTimeout(() => model.on('won', { elapsed: time, partsUsed: used, kindsUsed: kinds }), 800);
@@ -410,7 +437,11 @@ const scene = {
     if (s && knobHit(s, x, y)) { this.drag = { mode: 'rotate', tool: s, start: s.rot }; return; }
     if (y >= PLAY.bottom) {
       const k = this.slotAt(x, y);
-      if (k && this.counts[k] > 0) { this.counts[k]--; const t = { kind: k, x, y: y - HOVER, rot: 0, w: TOOL[k].w, h: TOOL[k].h, scale: .6 }; this.tools.push(t); this.selected = t; this.drag = { mode: 'move', tool: t, ox: 0, oy: -HOVER }; Sound.play('pickup'); }
+      if (k && this.counts[k] > 0) {
+        this.counts[k]--; const t = { kind: k, x, y: y - HOVER, rot: 0, w: TOOL[k].w, h: TOOL[k].h, scale: .6 };
+        if (k === 'portal') { t.role = 'in'; t.pair = ++this.pairSeq; const o = { kind: k, role: 'out', pair: t.pair, x: Math.min(x + 90, LW - 30), y: y - HOVER - 90, rot: 0, w: TOOL[k].w, h: TOOL[k].h, scale: .6 }; this.tools.push(o); }
+        this.tools.push(t); this.selected = t; this.drag = { mode: 'move', tool: t, ox: 0, oy: -HOVER }; Sound.play('pickup');
+      }
       return;
     }
     const t = this.toolAt(x, y);
@@ -426,12 +457,25 @@ const scene = {
     const d = this.drag; if (!d) return; this.drag = null;
     if (d.mode === 'move') {
       const t = d.tool;
-      if (t.y > PLAY.bottom - 6) { this.tools = this.tools.filter(o => o !== t); this.counts[t.kind]++; if (this.selected === t) this.selected = null; model.on('removed', t.kind); }
+      if (t.y > PLAY.bottom - 6) { this.tools = this.tools.filter(o => o !== t && !(t.kind === 'portal' && o.kind === 'portal' && o.pair === t.pair)); this.counts[t.kind]++; if (this.selected === t) this.selected = null; model.on('removed', t.kind); }
       else { t.ghost = false; model.on('placed', t.kind); }
     } else if (d.mode === 'rotate' && Math.abs(d.tool.rot - d.start) > .02) model.on('rotated');
   },
 };
 function up(t) { return { x: Math.sin(t.rot), y: -Math.cos(t.rot) }; }
+// The splitter is two slanted faces meeting at the apex; each face is a thin box in world space.
+function wedgeFaces(t) {
+  const faces = [];
+  for (const side of [-1, 1]) {
+    const ax = 0, ay = -14, bx = side * 32, by = 14;                 // apex -> base corner (local)
+    const ex = bx - ax, ey = by - ay, len = Math.hypot(ex, ey);
+    const nx = -side * ey / len, ny = side * ex / len;                 // inward normal
+    const cx = (ax + bx) / 2 - nx * 4, cy = (ay + by) / 2 - ny * 4;    // centre pushed inward by half thickness
+    const c = Math.cos(t.rot), sn = Math.sin(t.rot);
+    faces.push({ x: t.x + c * cx - sn * cy, y: t.y + sn * cx + c * cy, w: len, h: 8, rot: t.rot + Math.atan2(ey, ex) });
+  }
+  return faces;
+}
 function local(t, x, y) { const dx = x - t.x, dy = y - t.y, c = Math.cos(t.rot), s = Math.sin(t.rot); return { x: c * dx + s * dy, y: -s * dx + c * dy }; }
 function hit(t, x, y) { const l = local(t, x, y); return Math.abs(l.x) <= t.w / 2 + 14 && Math.abs(l.y) <= t.h / 2 + 14; }
 function inside(p, t, r) { const l = local(t, p.x, p.y); return Math.abs(l.x) <= t.w / 2 + r * .5 && Math.abs(l.y) <= t.h / 2 + r * .5; }
@@ -523,7 +567,7 @@ Sound.enabled = model.progress.soundOn;
 model.chapter = chapterOf(model.firstOpen()).id;
 
 // ---------- Rendering ----------
-const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+const canvas = document.getElementById('game'); let ctx = canvas.getContext('2d');
 const stage = document.getElementById('stage');
 let scale = 1;
 function resize() {
@@ -550,7 +594,7 @@ function sprite(kind) {
   return scene.sprites[kind] = c;
 }
 function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
-function drawToolShape(k, alpha = 1) {
+function drawToolShape(k, alpha = 1, role) {
   const T = TOOL[k]; ctx.globalAlpha = alpha;
   if (k === 'bumper' || k === 'slider' || k === 'sponge') {
     rrect(-T.w / 2, -T.h / 2, T.w, T.h, k === 'slider' ? 4 : 6); ctx.fillStyle = T.color; ctx.fill(); ctx.strokeStyle = T.stroke; ctx.lineWidth = 1.4; ctx.stroke();
@@ -565,6 +609,36 @@ function drawToolShape(k, alpha = 1) {
     ctx.beginPath(); ctx.arc(0, 0, 20, 0, 7); ctx.fillStyle = 'rgba(217,115,255,.12)'; ctx.fill(); ctx.strokeStyle = 'rgba(217,115,255,.6)'; ctx.lineWidth = 1.5; ctx.stroke();
     const ph = (performance.now() / 1400) % 1; ctx.beginPath(); ctx.arc(0, 0, 20 * (.4 + 2.2 * ph), 0, 7); ctx.strokeStyle = `rgba(217,115,255,${.7 * (1 - ph)})`; ctx.lineWidth = 1; ctx.stroke();
     ctx.shadowColor = T.color; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(0, 0, 7, 0, 7); ctx.fillStyle = T.color; ctx.fill(); ctx.shadowBlur = 0; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+  } else if (k === 'splitter') {
+    ctx.beginPath(); ctx.moveTo(0, -14); ctx.lineTo(32, 14); ctx.lineTo(-32, 14); ctx.closePath(); ctx.fillStyle = T.color; ctx.fill(); ctx.strokeStyle = T.stroke; ctx.lineWidth = 1.4; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(0, 11); ctx.strokeStyle = 'rgba(0,60,40,.35)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-2, -8); ctx.lineTo(-24, 11); ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 2; ctx.stroke();
+  } else if (k === 'fan') {
+    ctx.beginPath(); ctx.arc(0, 0, 20, 0, 7); ctx.fillStyle = 'rgba(166,242,107,.16)'; ctx.fill(); ctx.strokeStyle = T.color; ctx.lineWidth = 2; ctx.stroke();
+    const a0 = role === 'tray' ? 0 : performance.now() / 120;
+    for (let i = 0; i < 3; i++) { ctx.save(); ctx.rotate(a0 + i * Math.PI * 2 / 3); ctx.beginPath(); ctx.ellipse(0, -9, 4.5, 9, 0, 0, 7); ctx.fillStyle = T.color; ctx.fill(); ctx.restore(); }
+    ctx.beginPath(); ctx.arc(0, 0, 3.5, 0, 7); ctx.fillStyle = T.stroke; ctx.fill();
+    // breeze lines in front
+    ctx.strokeStyle = 'rgba(166,242,107,.55)'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 4]);
+    for (const dx of [-9, 0, 9]) { ctx.beginPath(); ctx.moveTo(dx, -24); ctx.lineTo(dx, -40); ctx.stroke(); }
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(0, -47); ctx.lineTo(-5, -41); ctx.lineTo(5, -41); ctx.closePath(); ctx.fillStyle = T.color; ctx.fill();
+  } else if (k === 'portal') {
+    const drawRing = (dx, isOut) => {
+      ctx.save(); ctx.translate(dx, 0);
+      ctx.beginPath(); ctx.arc(0, 0, 15, 0, 7); ctx.fillStyle = isOut ? 'rgba(255,93,162,.10)' : 'rgba(255,93,162,.28)'; ctx.fill();
+      ctx.strokeStyle = T.color; ctx.lineWidth = 3; if (isOut) ctx.setLineDash([5, 4]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = T.stroke; ctx.font = '900 8px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(isOut ? 'OUT' : 'IN', 0, 0.5); ctx.textBaseline = 'alphabetic';
+      if (isOut) { ctx.beginPath(); ctx.moveTo(0, -27); ctx.lineTo(-6, -19); ctx.lineTo(6, -19); ctx.closePath(); ctx.fillStyle = T.color; ctx.fill(); }
+      ctx.restore();
+    };
+    if (role === 'tray') { drawRing(-14, false); drawRing(14, true); } else drawRing(0, role === 'out');
+  } else if (k === 'repeller') {
+    ctx.beginPath(); ctx.arc(0, 0, 20, 0, 7); ctx.fillStyle = 'rgba(232,238,255,.08)'; ctx.fill(); ctx.strokeStyle = 'rgba(232,238,255,.55)'; ctx.lineWidth = 1.5; ctx.stroke();
+    const ph = role === 'tray' ? .5 : (performance.now() / 1200) % 1;
+    ctx.beginPath(); ctx.arc(0, 0, 8 + 16 * ph, 0, 7); ctx.strokeStyle = `rgba(232,238,255,${.6 * (1 - ph)})`; ctx.lineWidth = 1.2; ctx.stroke();
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 11, Math.sin(a) * 11); ctx.lineTo(Math.cos(a) * 17, Math.sin(a) * 17); ctx.strokeStyle = T.color; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.stroke(); }
+    ctx.beginPath(); ctx.arc(0, 0, 6, 0, 7); ctx.fillStyle = T.color; ctx.fill();
   }
   ctx.globalAlpha = 1;
 }
@@ -606,16 +680,20 @@ function draw() {
     ctx.save(); ctx.translate(t.x, t.y); ctx.rotate(t.rot); ctx.scale(t.scale, t.scale);
     if (t === scene.selected) { rrect(-t.w / 2 - 7, -t.h / 2 - 7, t.w + 14, t.h + 14, 10); ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1; ctx.stroke();
       ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillRect(-.75, -t.h / 2 - 20, 1.5, 20); ctx.beginPath(); ctx.arc(0, -t.h / 2 - 28, 9, 0, 7); ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); }
-    drawToolShape(t.kind, t.ghost ? .45 : 1);
+    drawToolShape(t.kind, t.ghost ? .45 : 1, t.role);
     ctx.restore();
   }
+  // portal links
+  ctx.strokeStyle = 'rgba(255,93,162,.35)'; ctx.lineWidth = 1; ctx.setLineDash([4, 6]);
+  for (const a of scene.tools) if (a.kind === 'portal' && a.role === 'in') { const b = scene.tools.find(t => t.kind === 'portal' && t.role === 'out' && t.pair === a.pair); if (b) { ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); } }
+  ctx.setLineDash([]);
   // puffs
   for (const q of scene.puffs) { ctx.globalAlpha = .9 * (1 - q.t); ctx.fillStyle = q.color; ctx.beginPath(); ctx.arc(q.x, q.y, (q.big ? 6 : 3) * (1 + q.t * (q.big ? 3 : 1.6)), 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
   // tray
   ctx.fillStyle = '#171C2E'; ctx.fillRect(0, PLAY.bottom, LW, TRAY); ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fillRect(0, PLAY.bottom, LW, 1);
   for (const s of scene.slots) {
-    const n = scene.counts[s.kind]; ctx.save(); ctx.translate(s.x, PLAY.bottom + 38); ctx.scale(.7, .7); drawToolShape(s.kind, n > 0 ? 1 : .28); ctx.restore();
-    ctx.fillStyle = n > 0 ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.35)'; ctx.font = '800 12px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(`${TOOL[s.kind].title} × ${n}`, s.x, PLAY.bottom + 76);
+    const n = scene.counts[s.kind]; ctx.save(); ctx.translate(s.x, PLAY.bottom + 38); const sc = scene.slots.length > 4 ? .58 : .7; ctx.scale(sc, sc); drawToolShape(s.kind, n > 0 ? 1 : .28, 'tray'); ctx.restore();
+    ctx.fillStyle = n > 0 ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.35)'; ctx.font = `800 ${scene.slots.length > 4 ? 10.5 : 12}px Nunito, sans-serif`; ctx.textAlign = 'center'; ctx.fillText(`${TOOL[s.kind].title} × ${n}`, s.x, PLAY.bottom + 76);
   }
 }
 function hexa(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
@@ -624,7 +702,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
   if (!(scale > 0)) resize();
-  if (model.state !== 'menu') scene.step(dt);
+  if (model.state !== 'menu' && $('sheet').hidden) scene.step(dt);
   if (model.state !== 'menu') draw();
   requestAnimationFrame(frame);
 }
@@ -650,14 +728,17 @@ const ui = {
     if (ms) this.msgTimer = setTimeout(() => this.hideMessage(), ms);
   },
   hideMessage() { clearTimeout(this.msgTimer); $('msg').classList.remove('show'); $('hudbar').classList.remove('dim'); },
-  hint(ms = 4500) { this.message('hint', model.level.hint, '💡', '', ms); },
+  hint(ms = 4500) { this.newPart = null; this.message('hint', model.level.hint, '💡', 'Parts ›', ms); },
   showMenu() { $('menu').hidden = false; $('hud').hidden = true; $('win').hidden = true; $('sheet').hidden = true; this.renderMenu(); },
   showPlaying() {
     $('menu').hidden = true; $('win').hidden = true; $('hud').hidden = false;
     $('lvlno').textContent = `Level ${model.levelIndex + 1}`; $('lvlname').textContent = model.level.name; $('parlbl').textContent = `Par ${clock(model.level.par)}`;
     this.time(); this.drops(); this.hideMessage();
+    const fresh = Object.keys(model.level.tools).filter(k => !model.progress.seenParts.includes(k));
     if (model.tutorialStep < 3) this.tutorial();
+    else if (fresh.length) { this.newPart = fresh[0]; this.message('tut', `New part: ${FULL_NAME[fresh[0]]}. ${TOOL[fresh[0]].blurb} Tap to learn more.`, '✦', '', 7000); }
     else if (!model.completed(model.levelIndex) && !model.run.resets) this.hint(4500);
+    fresh.forEach(k => model.progress.seenParts.push(k)); if (fresh.length) saveProgress(model.progress);
   },
   time() { const t = $('time'); t.textContent = clock(model.elapsed); const L = model.level; t.className = model.elapsed <= L.par ? '' : model.elapsed <= L.par * 1.6 ? 'warn' : 'late'; },
   drops() { $('drops').textContent = `${model.collected}/${model.level.total}`; },
@@ -709,26 +790,38 @@ const ui = {
     t.classList.add('show');
     setTimeout(() => { t.classList.remove('show'); setTimeout(() => { this.toasting = false; this.toast(); }, 450); }, 3200);
   },
-  sheet(kind) {
+  sheet(kind, highlight) {
     const s = $('sheet'); const p = model.progress;
     let body;
-    if (kind === 'ach') {
+    if (kind === 'parts') {
+      body = `<div class="sec">Controls</div><div class="list">
+        <div class="row"><span class="ico">☝</span><span class="tx"><span class="t" style="color:var(--text)">Drag a part up out of the tray</span><span class="d">Drop it anywhere on the playfield.</span></span></div>
+        <div class="row"><span class="ico">↻</span><span class="tx"><span class="t" style="color:var(--text)">Tap a part, then drag its knob</span><span class="d">The knob rotates it. Drag far from the part for fine control.</span></span></div>
+        <div class="row"><span class="ico">↓</span><span class="tx"><span class="t" style="color:var(--text)">Drag a part back to the tray</span><span class="d">Returns it. Droplets that stop moving evaporate on their own.</span></span></div></div>
+        <div class="sec">Parts</div><div class="list">` + TOOL_ORDER.map(k => `<div class="row ${k === highlight ? 'hl' : ''}" id="guide-${k}"><canvas class="thumb" data-kind="${k}" width="96" height="96"></canvas><span class="tx"><span class="t" style="color:var(--text)">${FULL_NAME[k]}</span><span class="d">${GUIDE[k].does}</span><span class="d" style="color:var(--gold)">Tip: ${GUIDE[k].tip}</span></span></div>`).join('') + '</div>';
+    } else if (kind === 'ach') {
       const n = Object.keys(p.achievements).length;
       body = `<div class="statstrip"><div class="stat"><span class="v">${fmt(p.stats.drops)}</span><span class="s">Drops caught</span></div><div class="stat"><span class="v">${p.stats.levelsCompleted}/${LEVELS.length}</span><span class="s">Levels done</span></div><div class="stat"><span class="v">${clock(p.stats.playSeconds)}</span><span class="s">Play time</span></div></div>
         <div class="sec">${n} of ${ACH.length} unlocked</div><div class="list">` + ACH.map(a => { const d = p.achievements[a.id]; return `<div class="row ${d ? 'on' : ''}"><span class="ico">${a.ico}</span><span class="tx"><span class="t">${a.title}</span><span class="d">${a.detail}</span>${d ? `<span class="when">${new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>` : ''}</span>${d ? '<span class="check">✔</span>' : ''}</div>`; }).join('') + '</div>';
     } else {
       body = `<div class="sec">Feel</div><div class="list"><div class="row toggle"><span class="t" style="color:var(--text)">Sound effects</span><button class="switch ${p.soundOn ? 'on' : ''}" id="swSound" role="switch" aria-checked="${p.soundOn}" aria-label="Sound effects"></button></div></div>
-        <div class="sec">Parts</div><div class="list">${TOOL_ORDER.map(k => `<div class="row"><span class="dot" style="background:${TOOL[k].color}"></span><span class="tx"><span class="t" style="color:var(--text)">${k === 'accelerator' ? 'Accelerator' : k === 'gravity' ? 'Gravity Well' : TOOL[k].title}</span><span class="d">${TOOL[k].blurb}</span></span></div>`).join('')}</div>
+        <div class="sec">Help</div><div class="list"><button class="row action" id="btnGuide" style="width:100%"><span class="t">How the parts work</span></button></div>
         <div class="sec">Progress</div><div class="list"><button class="row action" id="btnTut" style="width:100%"><span class="t">Replay the tutorial</span></button><button class="row action danger" id="btnWipe" style="width:100%"><span class="t">Reset all progress</span></button></div>
         <div id="confirm" class="confirm" hidden><b>Reset all progress?</b><span class="d" style="font-size:13px;color:var(--muted);font-weight:600">Stars, best times, and achievements will be cleared. This can't be undone.</span><div class="btns"><button class="btn" id="btnKeep">Keep my progress</button><button class="btn" id="btnYes" style="background:var(--danger)">Reset everything</button></div></div>
         <p class="about">Enigmo tribute · built in one shot.<br>Droplets, parts, and buckets, just like you remember.</p>`;
     }
-    s.innerHTML = `<div class="panel"><div class="head"><b>${kind === 'ach' ? 'Achievements' : 'Settings'}</b><button class="done" id="sheetDone">Done</button></div><div class="body">${body}</div></div>`;
+    s.innerHTML = `<div class="panel"><div class="head"><b>${kind === 'ach' ? 'Achievements' : kind === 'parts' ? 'How the parts work' : 'Settings'}</b><button class="done" id="sheetDone">Done</button></div><div class="body">${body}</div></div>`;
     s.hidden = false;
-    $('sheetDone').onclick = () => { s.hidden = true; this.renderMenu(); };
-    s.onclick = e => { if (e.target === s) { s.hidden = true; this.renderMenu(); } };
+    const close = () => { s.hidden = true; if (model.state === 'menu') this.renderMenu(); };
+    $('sheetDone').onclick = close;
+    s.onclick = e => { if (e.target === s) close(); };
+    if (kind === 'parts') {
+      s.querySelectorAll('canvas.thumb').forEach(c => { const g = c.getContext('2d'); const saved = ctx; ctx = g; g.setTransform(2, 0, 0, 2, 48, 52); const k = c.dataset.kind; if (k === 'fan' || k === 'portal') g.scale(.8, .8); if (k === 'splitter' || k === 'slider' || k === 'bumper' || k === 'sponge') g.scale(.62, .62); drawToolShape(k, 1, 'tray'); ctx = saved; });
+      if (highlight) { const el = $('guide-' + highlight); if (el) setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50); }
+    }
     if (kind === 'set') {
       $('swSound').onclick = () => { Sound.unlock(); model.setSound(!p.soundOn); $('swSound').classList.toggle('on', p.soundOn); $('swSound').setAttribute('aria-checked', p.soundOn); };
+      $('btnGuide').onclick = () => { Sound.play('tap'); this.sheet('parts'); };
       $('btnTut').onclick = () => { p.tutorialDone = false; saveProgress(p); s.hidden = true; this.renderMenu(); };
       $('btnWipe').onclick = () => $('confirm').hidden = false;
       $('btnKeep').onclick = () => $('confirm').hidden = true;
@@ -739,11 +832,13 @@ const ui = {
 $('btnBack').onclick = () => model.menu();
 $('btnReset').onclick = () => model.reset();
 $('btnHint').onclick = () => { Sound.play('tap'); ui.hint(5000); };
-$('msg').onclick = () => { if (model.tutorialStep >= 3) ui.hideMessage(); };
+$('msg').onclick = () => { if (model.tutorialStep >= 3) { ui.hideMessage(); Sound.play('tap'); ui.sheet('parts', ui.newPart); ui.newPart = null; } };
 $('btnAch').onclick = () => { Sound.play('tap'); ui.sheet('ach'); };
 $('btnSet').onclick = () => { Sound.play('tap'); ui.sheet('set'); };
+$('btnParts').onclick = () => { Sound.play('tap'); ui.sheet('parts'); };
 $('continue').onclick = () => { Sound.unlock(); Sound.play('tap'); model.play(model.firstOpen()); };
 ui.showMenu();
+window.__enigmo = { model, scene, ui, LEVELS };
 })();
 </script>
 
