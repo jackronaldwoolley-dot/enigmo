@@ -4,7 +4,14 @@ A from-scratch SwiftUI + SpriteKit remake of the classic Pangea puzzle game **En
 Droppers spray water, oil, and lava. You place parts to steer every droplet into the
 matching bucket. Fill every bucket to finish the level. Finish under par for three stars.
 
-## Run it
+## Play it in a browser
+
+**https://jackronaldwoolley-dot.github.io/enigmo/**
+
+That's the web port in `docs/index.html`: one HTML file with its own physics engine, the same
+24 levels, parts, stars, achievements, tutorial, and sound. It runs on phones and desktops.
+
+## Run the iOS app
 
 1. Open `Enigmo.xcodeproj` in Xcode 16 or newer.
 2. Pick any iPhone simulator (or your device with your own signing team).
@@ -58,6 +65,7 @@ xcodebuild -project Enigmo.xcodeproj -scheme Enigmo -sdk iphonesimulator \
 | `Enigmo/Achievements.swift` | Achievement definitions. Add one line to add an achievement. |
 | `Enigmo/SoundKit.swift` | Tiny synthesizer for sound effects, plus haptics. |
 | `Enigmo/ContentView.swift` | Menu, HUD, tutorial, results, achievements, settings, toasts. |
+| `docs/index.html` | The web port, served by GitHub Pages. |
 
 ## Adding a level
 

@@ -1,3 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0D121F">
+<meta name="description" content="Enigmo tribute: steer water, oil, and lava into buckets with bumpers, sliders, sponges, accelerators, and gravity wells.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%234DADFF'/%3E%3Ccircle cx='32' cy='32' r='12' fill='%23B3E0FF'/%3E%3C/svg%3E">
+<style>html { padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); background: #070A12; }</style>
 <title>Enigmo</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap">
 <style>
@@ -147,6 +156,8 @@
   #toast .t { font-size: 15px; font-weight: 800; } #toast .d { font-size: 11px; color: var(--muted); font-weight: 600; }
   @media (prefers-reduced-motion: reduce) { #toast, .bigstars i { transition: none; } }
 </style>
+</head>
+<body>
 
 <div id="app">
   <div id="stage">
@@ -724,3 +735,6 @@ $('continue').onclick = () => { Sound.unlock(); Sound.play('tap'); model.play(mo
 ui.showMenu();
 })();
 </script>
+
+</body>
+</html>
