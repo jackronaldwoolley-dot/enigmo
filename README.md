@@ -26,11 +26,11 @@ xcodebuild -project Enigmo.xcodeproj -scheme Enigmo -sdk iphonesimulator \
 
 ## What's in the game
 
-- **24 levels in 4 chapters.** Chapters unlock with stars, so replaying early levels faster is always worth it.
+- **30 levels in 5 chapters** (web). Chapters unlock with stars, so replaying early levels faster is always worth it.
 - **Three-star ratings.** Every level has a par time. Under par is three stars, under 1.6x par is two.
 - **Guided first level.** Three short prompts teach drag, rotate, and fill. Replay it from Settings.
 - **16 achievements** with in-game unlock toasts, plus lifetime stats.
-- **Five parts:** Bumper, Slider, Sponge, Accelerator, Gravity Well.
+- **Nine parts** (web): Bumper, Slider, Sponge, Accelerator, Gravity Well, Splitter, Fan, Portal, Repeller. The iOS app currently has the first five.
 - **Sound and haptics** you can switch off. All sounds are synthesized at launch, so there are no audio files.
 - **Progress is saved** automatically. One "Continue" button always takes you to the next open level.
 
@@ -52,6 +52,10 @@ xcodebuild -project Enigmo.xcodeproj -scheme Enigmo -sdk iphonesimulator \
 | Sponge | Absorbs any droplet that touches it. |
 | Accelerator | Fires droplets in the direction of its arrow. |
 | Gravity Well | Pulls nearby droplets toward it. Place it beside a stream to bend it. |
+| Splitter | A wedge that divides a stream in two. |
+| Fan | Blows a steady breeze along its arrow, over a distance. |
+| Portal | Droplets entering the IN ring leave from the OUT ring along its arrow. |
+| Repeller | Pushes nearby droplets away. A soft wall. |
 
 ## Code map
 

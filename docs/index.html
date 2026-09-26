@@ -248,6 +248,7 @@ const CHAPTERS = [
   { id: 1, name: 'Mixing It Up', tagline: 'Two liquids, tighter spaces, new tricks.', stars: 8, from: 6, to: 12 },
   { id: 2, name: 'Under Pressure', tagline: 'Funnels, roofs, and three streams at once.', stars: 20, from: 12, to: 18 },
   { id: 3, name: 'Master Plumber', tagline: 'Everything you know, all at once.', stars: 36, from: 18, to: 24 },
+  { id: 4, name: 'Deep End', tagline: 'New parts, sealed rooms, and three liquids in the air.', stars: 54, from: 24, to: 30 },
 ];
 // D = dropper [x, y, angleDeg, speed, kind], C = container [x, y, kind], W = wall [x, y, w, h]
 const LEVELS = [
@@ -275,6 +276,13 @@ const LEVELS = [
   { name: 'Four Corners', hint: 'Both streams have to cross under the bar. Stack your sliders at different heights.', D: [[.08,.93,-90,40,'water'],[.92,.93,-90,40,'oil']], C: [[.92,.04,'water'],[.08,.04,'oil']], W: [[.48,.30,.04,.70],[.20,.30,.60,.04]], tools: { slider: 4, bumper: 2, sponge: 1, accelerator: 1, repeller: 1 }, target: 25, par: 120 },
   { name: 'Rain', hint: 'Three streams, one bucket. The middle one is blocked.', D: [[.20,.93,-90,40,'water'],[.50,.93,-90,40,'water'],[.80,.93,-90,40,'water']], C: [[.50,.04,'water']], W: [[.40,.24,.20,.03]], tools: { slider: 4, bumper: 2, gravity: 1, splitter: 1 }, target: 60, par: 90 },
   { name: 'Grand Finale', hint: 'Everything at once. Breathe. One liquid at a time.', D: [[.10,.93,-90,40,'water'],[.90,.93,-90,40,'lava'],[.50,.06,90,500,'oil']], C: [[.75,.04,'water'],[.25,.04,'lava'],[.50,.45,'oil']], W: [[.38,.39,.24,.06],[.48,0,.04,.25]], tools: { slider: 4, bumper: 3, sponge: 1, accelerator: 1, gravity: 1, portal: 1, fan: 1 }, target: 25, par: 160 },
+  // Chapter 5 - Deep End
+  { name: 'Ricochet', hint: 'The jet fires away from the bucket. Bring it back, and come in under the lip.', D: [[.06,.88,-15,300,'water']], C: [[.14,.04,'water']], W: [[0,.22,.32,.03],[.62,.0,.04,.30]], tools: { bumper: 2, slider: 2, repeller: 1, portal: 1 }, target: 40, par: 100 },
+  { name: 'Three Ways', hint: 'One stream, three buckets. Two Splitters, stacked, make three streams.', D: [[.50,.95,-90,40,'water']], C: [[.14,.04,'water'],[.50,.04,'water'],[.86,.04,'water']], W: [[.30,.0,.03,.22],[.67,.0,.03,.22]], tools: { splitter: 2, slider: 3, bumper: 1 }, target: 15, par: 120 },
+  { name: 'Wind Tunnel', hint: 'The fountain can\'t reach the ledge alone. Fans add lift over a distance.', D: [[.15,.06,85,430,'oil']], C: [[.85,.70,'oil']], W: [[.70,.64,.30,.06],[.48,.30,.04,.45]], tools: { fan: 2, bumper: 1, slider: 1, accelerator: 1 }, target: 40, par: 110 },
+  { name: 'Contamination', hint: 'Three liquids cross paths. Sponge or repel whatever heads for the wrong bucket.', D: [[.50,.93,-90,40,'water'],[.04,.72,-10,260,'lava'],[.96,.55,190,240,'oil']], C: [[.50,.04,'water'],[.15,.04,'lava'],[.85,.04,'oil']], W: [[.33,.0,.03,.18],[.64,.0,.03,.18]], tools: { sponge: 2, slider: 3, bumper: 2, repeller: 1, splitter: 1 }, target: 20, par: 160 },
+  { name: 'Wormhole', hint: 'The bucket is sealed in a room. Only a Portal gets droplets inside.', D: [[.15,.93,-90,40,'water']], C: [[.80,.04,'water']], W: [[.58,.0,.03,.42],[.97,.0,.03,.42],[.58,.42,.42,.03]], tools: { portal: 1, slider: 2, bumper: 1, fan: 1 }, target: 40, par: 90 },
+  { name: 'Everything Everywhere', hint: 'Three streams, three buckets, one screen. Take a breath and route them one at a time.', D: [[.10,.93,-90,40,'water'],[.90,.93,-90,40,'oil'],[.50,.06,90,520,'lava']], C: [[.85,.04,'water'],[.15,.04,'oil'],[.50,.50,'lava']], W: [[.38,.44,.24,.06],[.48,.0,.04,.30]], tools: { slider: 4, bumper: 3, sponge: 1, portal: 1, fan: 1, repeller: 1 }, target: 25, par: 200 },
 ];
 LEVELS.forEach(l => { l.par = Math.round(l.par / PACE); l.parts = Object.values(l.tools).reduce((a, b) => a + b, 0); l.liquids = new Set(l.D.map(d => d[4])).size; l.total = l.target * l.C.length; });
 const chapterOf = i => CHAPTERS.find(c => i >= c.from && i < c.to) || CHAPTERS[0];
@@ -285,6 +293,7 @@ const ACH = [
   { id: 'chapter_2', title: 'Mixed Up', detail: 'Finish every level in Mixing It Up.', ico: '2', check: m => m.chapterComplete(1) },
   { id: 'chapter_3', title: 'Pressure Cooker', detail: 'Finish every level in Under Pressure.', ico: '3', check: m => m.chapterComplete(2) },
   { id: 'chapter_4', title: 'Master Plumber', detail: 'Finish every level in Master Plumber.', ico: '🔧', check: m => m.chapterComplete(3) },
+  { id: 'chapter_5', title: 'Deep Diver', detail: 'Finish every level in Deep End.', ico: '🌊', check: m => m.chapterComplete(4) },
   { id: 'quick_pour', title: 'Quick Pour', detail: 'Finish any level in under 20 seconds.', ico: '⚡', check: m => m.run.justWon && m.run.elapsed < 20 },
   { id: 'less_is_more', title: 'Less Is More', detail: 'Finish a level with at least two parts left in the tray.', ico: '−', check: m => m.run.justWon && m.level.parts - m.run.partsUsed >= 2 },
   { id: 'clean_hands', title: 'Clean Hands', detail: 'Finish a two-liquid level without poisoning a bucket.', ico: '✋', check: m => m.run.justWon && m.level.liquids >= 2 && m.run.contaminations === 0 },
