@@ -146,6 +146,7 @@ struct PillButton: View {
 struct HUDView: View {
     @ObservedObject var model: GameModel
     @State private var showHint = false
+    @State private var hintTask: Task<Void, Never>?
 
     private var timeColor: Color {
         if model.elapsed <= model.level.par { return .white }
@@ -155,7 +156,7 @@ struct HUDView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .center, spacing: 10) {
+            HStack(alignment: .center, spacing: 8) {
                 RoundButton(symbol: "chevron.left") { model.toMenu() }
                 VStack(alignment: .leading, spacing: 1) {
                     Text("LEVEL \(model.levelIndex + 1)")
@@ -163,10 +164,10 @@ struct HUDView: View {
                     Text(model.level.name)
                         .font(Theme.font(15)).lineLimit(1).minimumScaleFactor(0.7)
                 }
-                Spacer(minLength: 4)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 VStack(alignment: .trailing, spacing: 1) {
-                    Text("TIME · PAR \(model.level.par.clock)")
-                        .font(Theme.font(9, .heavy)).foregroundStyle(.white.opacity(0.55))
+                    Text("PAR \(model.level.par.clock)")
+                        .font(Theme.font(10, .heavy)).foregroundStyle(.white.opacity(0.55))
                     Text(model.elapsed.clock)
                         .font(Theme.font(15).monospacedDigit()).foregroundStyle(timeColor)
                 }
@@ -176,34 +177,58 @@ struct HUDView: View {
                     Text("\(model.collected)/\(model.goal)")
                         .font(Theme.font(15).monospacedDigit())
                 }
+                RoundButton(symbol: "lightbulb.fill") { Haptics.tap(); flashHint(seconds: 5) }
                 RoundButton(symbol: "arrow.counterclockwise") { model.reset() }
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 10)
             .padding(.top, 8)
             .frame(height: 62)
 
-            if model.tutorialStep < 3 {
-                TutorialCard(step: model.tutorialStep)
-                    .padding(.horizontal, 16).padding(.top, 10)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            } else if showHint {
-                Text(model.level.hint)
-                    .font(Theme.font(13, .semibold))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 14).padding(.vertical, 8)
-                    .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 14))
-                    .padding(.horizontal, 24).padding(.top, 10)
-                    .transition(.opacity)
-            }
             Spacer()
+
+            // Guidance strip: just above the tray, never over the top of the playfield, never blocks touches.
+            Group {
+                if model.tutorialStep < 3 {
+                    TutorialCard(step: model.tutorialStep)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else if showHint {
+                    HStack(spacing: 10) {
+                        Image(systemName: "lightbulb.fill").foregroundStyle(Theme.gold)
+                        Text(model.level.hint)
+                            .font(Theme.font(13, .semibold))
+                            .foregroundStyle(.white.opacity(0.9))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Theme.panel.opacity(0.94))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.12)))
+                    )
+                    .transition(.opacity)
+                }
+            }
+            .allowsHitTesting(false)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 100)
         }
-        .task(id: model.levelIndex) {
-            guard model.tutorialStep >= 3 else { return }
-            withAnimation(.easeIn(duration: 0.3)) { showHint = true }
-            try? await Task.sleep(nanoseconds: 5_000_000_000)
-            withAnimation(.easeOut(duration: 0.6)) { showHint = false }
+        .animation(.easeInOut(duration: 0.3), value: showHint)
+        .animation(.easeInOut(duration: 0.3), value: model.tutorialStep)
+        .onChange(of: model.levelIndex, initial: true) { _, _ in
+            hintTask?.cancel()
+            showHint = false
+            if model.tutorialStep >= 3, !model.progress.completed(model.levelIndex) { flashHint(seconds: 4.5) }
+        }
+    }
+
+    private func flashHint(seconds: Double) {
+        hintTask?.cancel()
+        showHint = true
+        hintTask = Task {
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            if !Task.isCancelled { showHint = false }
         }
     }
 }
@@ -212,7 +237,7 @@ struct TutorialCard: View {
     let step: Int
     private var text: (String, String) {
         switch step {
-        case 0: return ("hand.draw.fill", "Drag a Slider out of the tray and drop it under the stream.")
+        case 0: return ("hand.draw.fill", "Drag a Slider up out of the tray and drop it under the stream.")
         case 1: return ("rotate.right.fill", "Tap the Slider, then drag its knob to tilt it toward the bucket.")
         default: return ("drop.fill", "That's it. Fill the bucket to finish the level.")
         }
@@ -231,11 +256,11 @@ struct TutorialCard: View {
             Text("\(step + 1)/3")
                 .font(Theme.font(11, .heavy)).foregroundStyle(.white.opacity(0.4))
         }
-        .padding(14)
+        .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Theme.panel.opacity(0.96))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.gold.opacity(0.5), lineWidth: 1))
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Theme.panel.opacity(0.94))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.gold.opacity(0.6), lineWidth: 1))
         )
         .id(step)
     }
