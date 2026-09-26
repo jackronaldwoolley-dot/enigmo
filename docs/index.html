@@ -521,6 +521,7 @@ function resize() {
   const app = document.getElementById('app');
   const aw = app.clientWidth - 32, ah = app.clientHeight;
   scale = Math.min(aw / LW, ah / LH);
+  if (!(scale > 0.05)) { scale = 0; return; } // hidden or zero-sized viewport: try again on the next frame
   const w = Math.round(LW * scale), hgt = Math.round(LH * scale), dpr = window.devicePixelRatio || 1;
   stage.style.width = w + 'px'; stage.style.height = hgt + 'px';
   canvas.style.width = w + 'px'; canvas.style.height = hgt + 'px';
@@ -613,6 +614,7 @@ function hexa(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (!(scale > 0)) resize();
   if (model.state !== 'menu') scene.step(dt);
   if (model.state !== 'menu') draw();
   requestAnimationFrame(frame);
